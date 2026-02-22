@@ -123,7 +123,8 @@ graph TD
 - すべてのスライドに図表が必要なわけではない。テキストの方が適切な場合はテキストのみでよい
 - 図表を使う場合は、図表の前後にテキストでの説明も必ず含めること
 
-JSON配列のみを出力し、それ以外のテキストは含めないこと。"""
+JSON配列のみを出力し、それ以外のテキストは含めないこと。
+出力は ```json で囲まず、JSON配列をそのまま直接出力すること。[ で始まり ] で終わること。"""
 
 
 def extract_text_from_url(url):
@@ -191,11 +192,26 @@ def analyze_product(api_key, product_info):
         max_tokens=2000,
     )
     content = response.choices[0].message.content.strip()
-    if "```json" in content:
-        content = content.split("```json")[1].split("```")[0].strip()
-    elif "```" in content:
-        content = content.split("```")[1].split("```")[0].strip()
+    content = _extract_json_object(content)
     return json.loads(content)
+
+
+def _extract_json_object(text):
+    """テキストからJSONオブジェクト部分を安全に抽出する。"""
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[len("```json"):].strip()
+        if text.endswith("```"):
+            text = text[:-3].strip()
+    elif text.startswith("```"):
+        text = text[3:].strip()
+        if text.endswith("```"):
+            text = text[:-3].strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1]
+    return text
 
 
 def generate_slides(api_key, product_info, analysis_context=None, custom_prompt=None):
@@ -219,11 +235,34 @@ def generate_slides(api_key, product_info, analysis_context=None, custom_prompt=
         max_tokens=8192,
     )
     content = response.choices[0].message.content.strip()
-    if "```json" in content:
-        content = content.split("```json")[1].split("```")[0].strip()
-    elif "```" in content:
-        content = content.split("```")[1].split("```")[0].strip()
+    # AIの出力からJSON配列を抽出
+    # content内に```mermaid```や```chart```が含まれるため、
+    # 単純なsplit("```")では壊れる。JSONの [ ] で範囲を特定する。
+    content = _extract_json_array(content)
     return json.loads(content)
+
+
+def _extract_json_array(text):
+    """テキストからJSON配列部分を安全に抽出する。
+    コードブロック内にバッククォートが含まれていても正しく動作する。"""
+    # まず ```json で始まるコードブロックを除去（最外殻のみ）
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[len("```json"):].strip()
+        # 末尾の ``` を除去
+        if text.endswith("```"):
+            text = text[:-3].strip()
+    elif text.startswith("```"):
+        text = text[3:].strip()
+        if text.endswith("```"):
+            text = text[:-3].strip()
+
+    # JSON配列の先頭 [ と末尾 ] を探す
+    start = text.find("[")
+    end = text.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1]
+    return text
 
 
 @app.route("/")
