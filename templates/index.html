@@ -123,18 +123,22 @@
     <script>
         // === デフォルトプロンプト管理 ===
         let defaultPrompt = '';
+        let defaultPromptLoaded = false;
 
         // サーバーからデフォルトプロンプトを取得
         async function fetchDefaultPrompt() {
+            if (defaultPromptLoaded) return;
             try {
                 const resp = await fetch('/api/default-prompt');
                 const data = await resp.json();
                 defaultPrompt = data.prompt;
+                defaultPromptLoaded = true;
             } catch (e) {
                 console.error('デフォルトプロンプト取得失敗:', e);
             }
         }
-        fetchDefaultPrompt();
+        // ページ読み込み時に即取得開始
+        const defaultPromptPromise = fetchDefaultPrompt();
 
         function getCustomPrompt() {
             return localStorage.getItem('custom_prompt') || '';
@@ -166,7 +170,9 @@
         const promptTextarea = document.getElementById('promptTextarea');
 
         // モーダル開閉
-        document.getElementById('btnSettings').addEventListener('click', () => {
+        document.getElementById('btnSettings').addEventListener('click', async () => {
+            // デフォルトプロンプトの取得を待つ
+            await defaultPromptPromise;
             apiKeyInput.value = getApiKey();
             promptTextarea.value = getEffectivePrompt();
             modalOverlay.classList.add('active');
