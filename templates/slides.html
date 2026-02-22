@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <style>
         .reveal {
             font-family: 'Helvetica Neue', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
@@ -86,6 +88,28 @@
         .badge-flow { background: #f59e0b; }
         .badge-pricing { background: #8b5cf6; }
         .badge-summary { background: #6366f1; }
+        /* Mermaid図コンテナ */
+        .reveal .slide-content .mermaid-container {
+            display: flex;
+            justify-content: center;
+            margin: 0.8em 0;
+        }
+        .reveal .slide-content .mermaid-container svg {
+            max-width: 100%;
+            max-height: 400px;
+        }
+        /* Chart.jsグラフコンテナ */
+        .reveal .slide-content .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            height: 350px;
+            margin: 0.8em auto;
+        }
+        .reveal .slide-content .chart-container canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
         .reveal .controls { color: #2563eb; }
         .reveal .progress { color: #2563eb; height: 4px; }
         .top-bar {
@@ -131,7 +155,88 @@
             summary: ['まとめ', 'badge-summary']
         };
 
-        function buildSlides() {
+        // Mermaid初期化（手動レンダリングモード）
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'Helvetica Neue, Hiragino Sans, Noto Sans JP, sans-serif'
+        });
+
+        let chartCounter = 0;
+        let mermaidCounter = 0;
+
+        /**
+         * marked.parse()の出力HTMLから mermaid/chart コードブロックを検出し、
+         * 描画用コンテナに差し替える
+         */
+        function preprocessContent(html) {
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            const mermaidBlocks = [];
+            const chartBlocks = [];
+
+            const codeBlocks = temp.querySelectorAll('pre code');
+            codeBlocks.forEach(code => {
+                const pre = code.parentElement;
+                if (code.classList.contains('language-mermaid')) {
+                    const id = 'mermaid-' + (mermaidCounter++);
+                    const container = document.createElement('div');
+                    container.className = 'mermaid-container';
+                    container.id = id;
+                    mermaidBlocks.push({ id: id, code: code.textContent.trim() });
+                    pre.replaceWith(container);
+                } else if (code.classList.contains('language-chart')) {
+                    const id = 'chart-' + (chartCounter++);
+                    const container = document.createElement('div');
+                    container.className = 'chart-container';
+                    const canvas = document.createElement('canvas');
+                    canvas.id = id;
+                    container.appendChild(canvas);
+                    chartBlocks.push({ id: id, config: code.textContent.trim() });
+                    pre.replaceWith(container);
+                }
+            });
+
+            return { html: temp.innerHTML, mermaidBlocks, chartBlocks };
+        }
+
+        /** Mermaid図をSVGとして描画 */
+        async function renderMermaidBlocks(blocks) {
+            for (const block of blocks) {
+                try {
+                    const { svg } = await mermaid.render(block.id + '-svg', block.code);
+                    const el = document.getElementById(block.id);
+                    if (el) el.innerHTML = svg;
+                } catch (e) {
+                    console.error('Mermaid render error:', e);
+                    const el = document.getElementById(block.id);
+                    if (el) el.innerHTML = '<pre style="color:#ef4444;font-size:0.8em;">Mermaid図の描画エラー</pre>';
+                }
+            }
+        }
+
+        /** Chart.jsグラフを描画 */
+        function renderChartBlocks(blocks) {
+            blocks.forEach(block => {
+                try {
+                    const config = JSON.parse(block.config);
+                    config.options = config.options || {};
+                    config.options.responsive = true;
+                    config.options.maintainAspectRatio = true;
+                    const canvas = document.getElementById(block.id);
+                    if (canvas) new Chart(canvas.getContext('2d'), config);
+                } catch (e) {
+                    console.error('Chart.js render error:', e);
+                    const canvas = document.getElementById(block.id);
+                    if (canvas && canvas.parentElement) {
+                        canvas.parentElement.innerHTML = '<pre style="color:#ef4444;font-size:0.8em;">グラフの描画エラー</pre>';
+                    }
+                }
+            });
+        }
+
+        async function buildSlides() {
             const raw = sessionStorage.getItem('slides');
             if (!raw) {
                 window.location.href = '/';
@@ -140,9 +245,16 @@
             const slides = JSON.parse(raw);
             const container = document.getElementById('slidesContainer');
 
+            const allMermaidBlocks = [];
+            const allChartBlocks = [];
+
             slides.forEach(slide => {
                 const section = document.createElement('section');
-                const contentHtml = marked.parse(slide.content || '');
+                const rawHtml = marked.parse(slide.content || '');
+                const { html: contentHtml, mermaidBlocks, chartBlocks } = preprocessContent(rawHtml);
+
+                allMermaidBlocks.push(...mermaidBlocks);
+                allChartBlocks.push(...chartBlocks);
 
                 if (slide.type === 'cover') {
                     section.classList.add('cover-slide');
@@ -161,6 +273,7 @@
                 container.appendChild(section);
             });
 
+            // reveal.jsを初期化（DOMレイアウト確定後に図表を描画するため）
             Reveal.initialize({
                 hash: true,
                 slideNumber: true,
@@ -175,6 +288,13 @@
 
             Reveal.on('slidechanged', updatePageInfo);
             updatePageInfo();
+
+            // reveal.js初期化後に図表を描画
+            await renderMermaidBlocks(allMermaidBlocks);
+            renderChartBlocks(allChartBlocks);
+
+            // 図表描画後にレイアウトを再計算
+            Reveal.layout();
         }
 
         function updatePageInfo() {

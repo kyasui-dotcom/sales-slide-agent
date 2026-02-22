@@ -6,6 +6,8 @@
     <title>営業提案資料ジェネレーター</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -230,6 +232,17 @@
     </div>
 
     <script>
+        // === Mermaid初期化 ===
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: 'Helvetica Neue, Hiragino Sans, Noto Sans JP, sans-serif'
+        });
+        let previewChartInstances = {};
+        let previewMermaidCounter = 0;
+        let previewChartCounter = 0;
+
         // === 状態管理 ===
         let currentSlides = [];
 
@@ -289,11 +302,90 @@
             document.getElementById('stepPreview').style.display = step === 'preview' ? '' : 'none';
         }
 
+        // === Mermaid/Chart.js対応のコンテンツ描画 ===
+        async function renderContentWithDiagrams(markdownText, targetElement, slideIndex) {
+            const rawHtml = marked.parse(markdownText || '');
+            const temp = document.createElement('div');
+            temp.innerHTML = rawHtml;
+
+            const mermaidBlocks = [];
+            const chartBlocks = [];
+
+            const codeBlocks = temp.querySelectorAll('pre code');
+            codeBlocks.forEach(code => {
+                const pre = code.parentElement;
+                if (code.classList.contains('language-mermaid')) {
+                    const id = 'preview-mermaid-' + slideIndex + '-' + (previewMermaidCounter++);
+                    const container = document.createElement('div');
+                    container.className = 'mermaid-container';
+                    container.id = id;
+                    mermaidBlocks.push({ id, code: code.textContent.trim() });
+                    pre.replaceWith(container);
+                } else if (code.classList.contains('language-chart')) {
+                    const id = 'preview-chart-' + slideIndex + '-' + (previewChartCounter++);
+                    const container = document.createElement('div');
+                    container.className = 'chart-container';
+                    const canvas = document.createElement('canvas');
+                    canvas.id = id;
+                    container.appendChild(canvas);
+                    chartBlocks.push({ id, config: code.textContent.trim() });
+                    pre.replaceWith(container);
+                }
+            });
+
+            targetElement.innerHTML = temp.innerHTML;
+
+            // 古いChart.jsインスタンスを破棄（メモリリーク防止）
+            const prefix = 'preview-chart-' + slideIndex + '-';
+            Object.keys(previewChartInstances).forEach(key => {
+                if (key.startsWith(prefix)) {
+                    previewChartInstances[key].destroy();
+                    delete previewChartInstances[key];
+                }
+            });
+
+            // Mermaid描画
+            for (const block of mermaidBlocks) {
+                try {
+                    const { svg } = await mermaid.render(block.id + '-svg', block.code);
+                    const el = document.getElementById(block.id);
+                    if (el) el.innerHTML = svg;
+                } catch (e) {
+                    const el = document.getElementById(block.id);
+                    if (el) el.innerHTML = '<pre style="color:#ef4444;font-size:0.8em;">Mermaid図の描画エラー</pre>';
+                }
+            }
+
+            // Chart.js描画
+            chartBlocks.forEach(block => {
+                try {
+                    const config = JSON.parse(block.config);
+                    config.options = config.options || {};
+                    config.options.responsive = true;
+                    config.options.maintainAspectRatio = true;
+                    const canvas = document.getElementById(block.id);
+                    if (canvas) {
+                        const instance = new Chart(canvas.getContext('2d'), config);
+                        previewChartInstances[block.id] = instance;
+                    }
+                } catch (e) {
+                    const canvas = document.getElementById(block.id);
+                    if (canvas && canvas.parentElement) {
+                        canvas.parentElement.innerHTML = '<pre style="color:#ef4444;font-size:0.8em;">グラフの描画エラー</pre>';
+                    }
+                }
+            });
+        }
+
         // === プレビュー画面を構築 ===
         function renderPreview(slides) {
             currentSlides = slides;
             const container = document.getElementById('previewSlides');
             container.innerHTML = '';
+
+            // カウンターリセット
+            previewMermaidCounter = 0;
+            previewChartCounter = 0;
 
             slides.forEach((slide, i) => {
                 const card = document.createElement('div');
@@ -311,7 +403,7 @@
                         <input type="text" class="preview-title-input" data-index="${i}" value="${slide.title.replace(/"/g, '&quot;')}">
                     </div>
                     <div class="preview-field">
-                        <label>内容（Markdown）</label>
+                        <label>内容（Markdown / Mermaid / Chart）</label>
                         <textarea class="preview-content-input" data-index="${i}" rows="8">${slide.content}</textarea>
                     </div>
                     <div class="preview-field">
@@ -321,14 +413,18 @@
                 `;
                 container.appendChild(card);
 
-                // Markdownプレビューを初期レンダリング
+                // 図表対応プレビューを初期レンダリング
                 const rendered = card.querySelector(`#rendered-${i}`);
-                rendered.innerHTML = marked.parse(slide.content || '');
+                renderContentWithDiagrams(slide.content, rendered, i);
 
-                // 内容変更時にプレビューを更新
+                // 編集時にデバウンス付きで再描画（500ms待ち）
                 const contentInput = card.querySelector('.preview-content-input');
+                let debounceTimer = null;
                 contentInput.addEventListener('input', () => {
-                    rendered.innerHTML = marked.parse(contentInput.value || '');
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        renderContentWithDiagrams(contentInput.value, rendered, i);
+                    }, 500);
                 });
             });
 

@@ -76,6 +76,53 @@ SYSTEM_OUTPUT_RULES = """
 6. **まとめ** (type: "summary") - 要点整理と次の具体的アクション
 
 各スライドの内容は十分な分量を確保し、箇条書き3行程度で終わらせず、深い分析と具体的な提案を含めること。
+
+# 図表・グラフの活用ルール
+
+contentフィールドのマークダウン内に、以下の2種類のコードブロックを使って図表やグラフを含めてください。
+テキストだけでなく、視覚的な図表を積極的に活用し、説得力のある資料にすること。
+
+## Mermaid図（フローチャート、関係図など）
+```mermaid
+graph TD
+    A["ステップ1"] --> B["ステップ2"]
+    B --> C["ステップ3"]
+```
+
+## Chart.jsグラフ（棒グラフ、円グラフ、折れ線グラフなど）
+```chart
+{
+  "type": "bar",
+  "data": {
+    "labels": ["ラベル1", "ラベル2"],
+    "datasets": [{
+      "label": "データセット名",
+      "data": [10, 20],
+      "backgroundColor": ["#2563eb", "#ef4444"]
+    }]
+  },
+  "options": {
+    "responsive": true,
+    "maintainAspectRatio": true
+  }
+}
+```
+
+## スライドタイプ別の推奨図表
+- **analysis**: 市場シェアの円グラフ（chart/pie）、競合比較の棒グラフ（chart/bar）
+- **proposal**: ターゲットセグメントの関係図（mermaid/graph LR）、機会の大きさのドーナツ（chart/doughnut）
+- **flow**: 営業プロセスのフローチャート（mermaid/graph TD）、タイムライン（chart/line）
+- **pricing**: 料金プラン比較の棒グラフ（chart/bar）、ROI推移（chart/line）
+- **summary**: KPI改善予測の棒グラフ（chart/bar）
+
+## 図表の注意事項
+- 1つのスライドに図表は最大1つまで（テキスト説明と組み合わせる）
+- Mermaidのノードテキストに括弧や特殊記号がある場合は["引用符"]で囲むこと
+- Chart.jsのJSONは厳密なJSON形式（末尾カンマ禁止、キーはダブルクォート）で書くこと
+- 色は #2563eb（青）、#ef4444（赤）、#22c55e（緑）、#f59e0b（黄）、#8b5cf6（紫）、#0ea5e9（水色）を使うこと
+- すべてのスライドに図表が必要なわけではない。テキストの方が適切な場合はテキストのみでよい
+- 図表を使う場合は、図表の前後にテキストでの説明も必ず含めること
+
 JSON配列のみを出力し、それ以外のテキストは含めないこと。"""
 
 
@@ -169,7 +216,7 @@ def generate_slides(api_key, product_info, analysis_context=None, custom_prompt=
             {"role": "user", "content": user_message},
         ],
         temperature=0.7,
-        max_tokens=4096,
+        max_tokens=8192,
     )
     content = response.choices[0].message.content.strip()
     if "```json" in content:
