@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>営業提案資料ジェネレーター</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>営業提案資料ジェネレーター</h1>
+            <p class="subtitle">商品情報を入力すると、AIが提案スライドを自動生成します</p>
+
+            <div class="tabs">
+                <button class="tab active" data-tab="url">URL</button>
+                <button class="tab" data-tab="pdf">PDF</button>
+                <button class="tab" data-tab="text">テキスト</button>
+            </div>
+
+            <form id="generateForm" enctype="multipart/form-data">
+                <input type="hidden" name="input_type" id="inputType" value="url">
+
+                <div class="tab-content active" id="tab-url">
+                    <label for="url">商品ページのURL</label>
+                    <input type="url" id="url" name="url" placeholder="https://example.com/product">
+                </div>
+
+                <div class="tab-content" id="tab-pdf">
+                    <label for="pdfFile">商品資料PDF</label>
+                    <div class="file-upload">
+                        <input type="file" id="pdfFile" name="pdf_file" accept=".pdf">
+                        <span class="file-label" id="fileLabel">クリックしてPDFを選択</span>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-text">
+                    <label for="textInput">商品情報をテキストで入力</label>
+                    <textarea id="textInput" name="text_input" rows="10"
+                        placeholder="商品名、特徴、ターゲット、価格帯、現在の課題など、できるだけ詳しく入力してください"></textarea>
+                </div>
+
+                <button type="submit" class="btn-generate" id="btnGenerate">
+                    提案資料を生成
+                </button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>AIが提案資料を生成しています...</p>
+                <p class="loading-sub">30秒〜1分ほどお待ちください</p>
+            </div>
+
+            <div class="error" id="error"></div>
+        </div>
+    </div>
+
+    <script>
+        // タブ切替
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                const target = tab.dataset.tab;
+                document.getElementById('tab-' + target).classList.add('active');
+                document.getElementById('inputType').value = target;
+            });
+        });
+
+        // PDFファイル名表示
+        document.getElementById('pdfFile').addEventListener('change', (e) => {
+            const name = e.target.files[0]?.name || 'クリックしてPDFを選択';
+            document.getElementById('fileLabel').textContent = name;
+        });
+
+        // フォーム送信
+        document.getElementById('generateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const btn = document.getElementById('btnGenerate');
+
+            error.style.display = 'none';
+            loading.style.display = 'block';
+            btn.disabled = true;
+
+            try {
+                const formData = new FormData(e.target);
+                const resp = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await resp.json();
+
+                if (data.error) {
+                    error.textContent = data.error;
+                    error.style.display = 'block';
+                } else {
+                    // スライドデータをsessionStorageに保存してスライド画面へ遷移
+                    sessionStorage.setItem('slides', JSON.stringify(data.slides));
+                    window.location.href = '/slides';
+                }
+            } catch (err) {
+                error.textContent = '通信エラーが発生しました。もう一度お試しください。';
+                error.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

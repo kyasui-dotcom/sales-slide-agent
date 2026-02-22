@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提案資料 - スライドショー</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/white.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .reveal {
+            font-family: 'Helvetica Neue', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+        }
+        .reveal h1, .reveal h2, .reveal h3 {
+            color: #1a1a2e;
+            font-weight: 700;
+            text-transform: none;
+        }
+        .reveal h2 {
+            font-size: 1.6em;
+            margin-bottom: 0.5em;
+        }
+        .reveal .slide-content {
+            text-align: left;
+            font-size: 0.65em;
+            line-height: 1.7;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .reveal .slide-content ul,
+        .reveal .slide-content ol {
+            display: block;
+            margin-left: 1em;
+        }
+        .reveal .slide-content li {
+            margin-bottom: 0.4em;
+        }
+        .reveal .slide-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            font-size: 0.9em;
+        }
+        .reveal .slide-content th,
+        .reveal .slide-content td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .reveal .slide-content th {
+            background: #2563eb;
+            color: #fff;
+            font-weight: 600;
+        }
+        .reveal .slide-content tr:nth-child(even) {
+            background: #f8fafc;
+        }
+        .reveal .slide-content strong {
+            color: #2563eb;
+        }
+        .reveal section.cover-slide {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .reveal section.cover-slide h1 {
+            font-size: 2em;
+            color: #2563eb;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 0.3em;
+        }
+        .reveal .type-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 0.45em;
+            font-weight: 600;
+            margin-bottom: 0.5em;
+            color: #fff;
+        }
+        .badge-analysis { background: #ef4444; }
+        .badge-proposal { background: #22c55e; }
+        .badge-flow { background: #f59e0b; }
+        .badge-pricing { background: #8b5cf6; }
+        .badge-summary { background: #6366f1; }
+        .reveal .controls { color: #2563eb; }
+        .reveal .progress { color: #2563eb; height: 4px; }
+        .top-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            background: rgba(255,255,255,0.95);
+            border-bottom: 1px solid #e5e7eb;
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .top-bar a {
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .top-bar .page-info {
+            font-size: 13px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="/">&#8592; 戻る</a>
+        <span class="page-info" id="pageInfo"></span>
+    </div>
+    <div class="reveal">
+        <div class="slides" id="slidesContainer">
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+    <script>
+        const BADGE_MAP = {
+            analysis: ['市場環境分析', 'badge-analysis'],
+            proposal: ['新ターゲット提案', 'badge-proposal'],
+            flow: ['営業フロー', 'badge-flow'],
+            pricing: ['支援範囲', 'badge-pricing'],
+            summary: ['まとめ', 'badge-summary']
+        };
+
+        function buildSlides() {
+            const raw = sessionStorage.getItem('slides');
+            if (!raw) {
+                window.location.href = '/';
+                return;
+            }
+            const slides = JSON.parse(raw);
+            const container = document.getElementById('slidesContainer');
+
+            slides.forEach(slide => {
+                const section = document.createElement('section');
+                const contentHtml = marked.parse(slide.content || '');
+
+                if (slide.type === 'cover') {
+                    section.classList.add('cover-slide');
+                    section.innerHTML = `<h1>${slide.title}</h1><div class="slide-content">${contentHtml}</div>`;
+                } else {
+                    const badge = BADGE_MAP[slide.type];
+                    const badgeHtml = badge
+                        ? `<span class="type-badge ${badge[1]}">${badge[0]}</span>`
+                        : '';
+                    section.innerHTML = `
+                        ${badgeHtml}
+                        <h2>${slide.title}</h2>
+                        <div class="slide-content">${contentHtml}</div>
+                    `;
+                }
+                container.appendChild(section);
+            });
+
+            Reveal.initialize({
+                hash: true,
+                slideNumber: true,
+                width: 1200,
+                height: 700,
+                margin: 0.08,
+                transition: 'slide',
+                controls: true,
+                progress: true,
+                center: false,
+            });
+
+            Reveal.on('slidechanged', updatePageInfo);
+            updatePageInfo();
+        }
+
+        function updatePageInfo() {
+            const current = Reveal.getIndices().h + 1;
+            const total = Reveal.getTotalSlides();
+            document.getElementById('pageInfo').textContent = `${current} / ${total}`;
+        }
+
+        buildSlides();
+    </script>
+</body>
+</html>
