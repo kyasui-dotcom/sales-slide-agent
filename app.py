@@ -7,7 +7,12 @@ from openai import OpenAI
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfReader
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static"),
+)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
 
 # ユーザーが編集できるプロンプト部分（役割・思考プロセス・トーン）
