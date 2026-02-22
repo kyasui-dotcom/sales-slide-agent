@@ -10,8 +10,6 @@ from PyPDF2 import PdfReader
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
 SYSTEM_PROMPT = """あなたは、B2B商材の市場分析と営業戦略の立案を行うプロフェッショナルな営業コンサルタントです。
 
 # 思考プロセス
@@ -57,7 +55,6 @@ def extract_text_from_url(url):
     for tag in soup(["script", "style", "nav", "footer", "header"]):
         tag.decompose()
     text = soup.get_text(separator="\n", strip=True)
-    # 長すぎる場合は切り詰め
     return text[:8000]
 
 
@@ -73,8 +70,9 @@ def extract_text_from_pdf(file_storage):
     return text[:8000]
 
 
-def generate_slides(product_info):
-    """OpenAI APIで提案資料スライドを生成"""
+def generate_slides(api_key, product_info):
+    """OpenAI APIで提案資料スライドを生成（リクエストごとにAPIキーを使用）"""
+    client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -104,6 +102,10 @@ def index():
 @app.route("/generate", methods=["POST"])
 def generate():
     input_type = request.form.get("input_type", "text")
+    api_key = request.form.get("api_key", "").strip()
+
+    if not api_key:
+        return jsonify({"error": "APIキーが設定されていません。画面右上の歯車アイコンから設定してください。"}), 400
 
     try:
         if input_type == "url":
@@ -131,7 +133,7 @@ def generate():
         if len(product_info.strip()) < 10:
             return jsonify({"error": "商品情報が短すぎます。もう少し詳しい情報を入力してください"}), 400
 
-        slides = generate_slides(product_info)
+        slides = generate_slides(api_key, product_info)
         return jsonify({"slides": slides})
 
     except requests.RequestException as e:
@@ -139,7 +141,10 @@ def generate():
     except json.JSONDecodeError:
         return jsonify({"error": "AIからの応答の解析に失敗しました。もう一度お試しください"}), 500
     except Exception as e:
-        return jsonify({"error": f"エラーが発生しました: {str(e)}"}), 500
+        error_msg = str(e)
+        if "authentication" in error_msg.lower() or "api key" in error_msg.lower():
+            return jsonify({"error": "APIキーが無効です。正しいキーを設定してください。"}), 401
+        return jsonify({"error": f"エラーが発生しました: {error_msg}"}), 500
 
 
 @app.route("/slides")
