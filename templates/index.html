@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>営業提案資料ジェネレーター</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <div class="container">
+
+    <!-- ===== STEP 1: 入力画面 ===== -->
+    <div class="container" id="stepInput">
         <div class="card">
             <div class="card-header">
                 <h1>営業提案資料ジェネレーター</h1>
@@ -20,7 +23,6 @@
             </div>
             <p class="subtitle">商品情報を入力すると、AIが提案スライドを自動生成します</p>
 
-            <!-- APIキー未設定の警告 -->
             <div class="api-warning" id="apiWarning">
                 <span>&#9888;</span> APIキーが未設定です。右上の歯車アイコンから設定してください。
             </div>
@@ -68,7 +70,24 @@
         </div>
     </div>
 
-    <!-- 設定モーダル -->
+    <!-- ===== STEP 2: プレビュー・編集画面 ===== -->
+    <div class="preview-container" id="stepPreview" style="display:none;">
+        <div class="preview-header">
+            <h2>生成結果プレビュー</h2>
+            <p class="preview-subtitle">各スライドの内容を確認・編集してから、スライド化できます。</p>
+        </div>
+
+        <div class="preview-slides" id="previewSlides">
+            <!-- JSで動的に生成 -->
+        </div>
+
+        <div class="preview-actions">
+            <button class="btn-back" id="btnBackToInput">&#8592; 入力に戻る</button>
+            <button class="btn-generate btn-to-slides" id="btnToSlides">この内容でスライド化 &#8594;</button>
+        </div>
+    </div>
+
+    <!-- ===== 設定モーダル ===== -->
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal modal-wide">
             <div class="modal-header">
@@ -76,13 +95,11 @@
                 <button class="modal-close" id="modalClose">&times;</button>
             </div>
 
-            <!-- モーダル内タブ -->
             <div class="modal-tabs">
                 <button class="modal-tab active" data-modal-tab="apikey">APIキー</button>
                 <button class="modal-tab" data-modal-tab="prompt">プロンプト</button>
             </div>
 
-            <!-- APIキータブ -->
             <div class="modal-tab-content active" id="modal-tab-apikey">
                 <div class="modal-body">
                     <label for="apiKeyInput">OpenAI APIキー</label>
@@ -104,7 +121,6 @@
                 </div>
             </div>
 
-            <!-- プロンプトタブ -->
             <div class="modal-tab-content" id="modal-tab-prompt">
                 <div class="modal-body">
                     <label for="promptTextarea">AIへの指示プロンプト（役割・思考プロセス・トーン）</label>
@@ -121,11 +137,22 @@
     </div>
 
     <script>
+        // === 状態管理 ===
+        let currentSlides = [];
+
+        const TYPE_LABELS = {
+            cover: '表紙',
+            analysis: '市場環境分析',
+            proposal: '新ターゲット提案',
+            flow: '営業フロー',
+            pricing: '支援範囲と成果報酬',
+            summary: 'まとめ'
+        };
+
         // === デフォルトプロンプト管理 ===
         let defaultPrompt = '';
         let defaultPromptLoaded = false;
 
-        // サーバーからデフォルトプロンプトを取得
         async function fetchDefaultPrompt() {
             if (defaultPromptLoaded) return;
             try {
@@ -137,7 +164,6 @@
                 console.error('デフォルトプロンプト取得失敗:', e);
             }
         }
-        // ページ読み込み時に即取得開始
         const defaultPromptPromise = fetchDefaultPrompt();
 
         function getCustomPrompt() {
@@ -155,23 +181,81 @@
 
         function updateApiWarning() {
             const warning = document.getElementById('apiWarning');
-            if (getApiKey()) {
-                warning.style.display = 'none';
-            } else {
-                warning.style.display = 'flex';
-            }
+            warning.style.display = getApiKey() ? 'none' : 'flex';
         }
 
         updateApiWarning();
+
+        // === 画面切替 ===
+        function showStep(step) {
+            document.getElementById('stepInput').style.display = step === 'input' ? '' : 'none';
+            document.getElementById('stepPreview').style.display = step === 'preview' ? '' : 'none';
+        }
+
+        // === プレビュー画面を構築 ===
+        function renderPreview(slides) {
+            currentSlides = slides;
+            const container = document.getElementById('previewSlides');
+            container.innerHTML = '';
+
+            slides.forEach((slide, i) => {
+                const card = document.createElement('div');
+                card.className = 'preview-card';
+
+                const typeLabel = TYPE_LABELS[slide.type] || slide.type;
+
+                card.innerHTML = `
+                    <div class="preview-card-header">
+                        <span class="preview-card-num">${i + 1}</span>
+                        <span class="preview-card-type type-${slide.type}">${typeLabel}</span>
+                    </div>
+                    <div class="preview-field">
+                        <label>タイトル</label>
+                        <input type="text" class="preview-title-input" data-index="${i}" value="${slide.title.replace(/"/g, '&quot;')}">
+                    </div>
+                    <div class="preview-field">
+                        <label>内容（Markdown）</label>
+                        <textarea class="preview-content-input" data-index="${i}" rows="8">${slide.content}</textarea>
+                    </div>
+                    <div class="preview-field">
+                        <label>プレビュー</label>
+                        <div class="preview-rendered" id="rendered-${i}"></div>
+                    </div>
+                `;
+                container.appendChild(card);
+
+                // Markdownプレビューを初期レンダリング
+                const rendered = card.querySelector(`#rendered-${i}`);
+                rendered.innerHTML = marked.parse(slide.content || '');
+
+                // 内容変更時にプレビューを更新
+                const contentInput = card.querySelector('.preview-content-input');
+                contentInput.addEventListener('input', () => {
+                    rendered.innerHTML = marked.parse(contentInput.value || '');
+                });
+            });
+
+            showStep('preview');
+            window.scrollTo(0, 0);
+        }
+
+        // === プレビューからスライドデータを収集 ===
+        function collectEditedSlides() {
+            const titles = document.querySelectorAll('.preview-title-input');
+            const contents = document.querySelectorAll('.preview-content-input');
+            return currentSlides.map((slide, i) => ({
+                ...slide,
+                title: titles[i].value,
+                content: contents[i].value
+            }));
+        }
 
         // === 設定モーダル ===
         const modalOverlay = document.getElementById('modalOverlay');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const promptTextarea = document.getElementById('promptTextarea');
 
-        // モーダル開閉
         document.getElementById('btnSettings').addEventListener('click', async () => {
-            // デフォルトプロンプトの取得を待つ
             await defaultPromptPromise;
             apiKeyInput.value = getApiKey();
             promptTextarea.value = getEffectivePrompt();
@@ -186,32 +270,24 @@
             if (e.target === modalOverlay) modalOverlay.classList.remove('active');
         });
 
-        // モーダル内タブ切替
         document.querySelectorAll('.modal-tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
                 tab.classList.add('active');
-                const target = tab.dataset.modalTab;
-                document.getElementById('modal-tab-' + target).classList.add('active');
+                document.getElementById('modal-tab-' + tab.dataset.modalTab).classList.add('active');
             });
         });
 
-        // === APIキー操作 ===
+        // APIキー操作
         document.getElementById('btnToggleKey').addEventListener('click', () => {
             apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
         });
 
         document.getElementById('btnSaveKey').addEventListener('click', () => {
             const key = apiKeyInput.value.trim();
-            if (!key) {
-                showStatus('apiKeyStatus', 'APIキーを入力してください', 'error');
-                return;
-            }
-            if (!key.startsWith('sk-')) {
-                showStatus('apiKeyStatus', 'APIキーは "sk-" で始まる必要があります', 'error');
-                return;
-            }
+            if (!key) { showStatus('apiKeyStatus', 'APIキーを入力してください', 'error'); return; }
+            if (!key.startsWith('sk-')) { showStatus('apiKeyStatus', 'APIキーは "sk-" で始まる必要があります', 'error'); return; }
             localStorage.setItem('openai_api_key', key);
             showStatus('apiKeyStatus', '保存しました', 'success');
             updateApiWarning();
@@ -224,13 +300,10 @@
             updateApiWarning();
         });
 
-        // === プロンプト操作 ===
+        // プロンプト操作
         document.getElementById('btnSavePrompt').addEventListener('click', () => {
             const prompt = promptTextarea.value.trim();
-            if (!prompt) {
-                showStatus('promptStatus', 'プロンプトを入力してください', 'error');
-                return;
-            }
+            if (!prompt) { showStatus('promptStatus', 'プロンプトを入力してください', 'error'); return; }
             localStorage.setItem('custom_prompt', prompt);
             showStatus('promptStatus', '保存しました', 'success');
         });
@@ -241,7 +314,6 @@
             showStatus('promptStatus', 'デフォルトに戻しました', 'success');
         });
 
-        // 汎用ステータス表示
         function showStatus(elementId, msg, type) {
             const status = document.getElementById(elementId);
             status.textContent = msg;
@@ -256,19 +328,16 @@
                 document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 tab.classList.add('active');
-                const target = tab.dataset.tab;
-                document.getElementById('tab-' + target).classList.add('active');
-                document.getElementById('inputType').value = target;
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+                document.getElementById('inputType').value = tab.dataset.tab;
             });
         });
 
-        // PDFファイル名表示
         document.getElementById('pdfFile').addEventListener('change', (e) => {
-            const name = e.target.files[0]?.name || 'クリックしてPDFを選択';
-            document.getElementById('fileLabel').textContent = name;
+            document.getElementById('fileLabel').textContent = e.target.files[0]?.name || 'クリックしてPDFを選択';
         });
 
-        // === フォーム送信 ===
+        // === フォーム送信 → プレビュー ===
         document.getElementById('generateForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const loading = document.getElementById('loading');
@@ -289,25 +358,17 @@
             try {
                 const formData = new FormData(e.target);
                 formData.append('api_key', apiKey);
-
-                // カスタムプロンプトがあれば送信
                 const customPrompt = getCustomPrompt();
-                if (customPrompt) {
-                    formData.append('custom_prompt', customPrompt);
-                }
+                if (customPrompt) formData.append('custom_prompt', customPrompt);
 
-                const resp = await fetch('/generate', {
-                    method: 'POST',
-                    body: formData
-                });
+                const resp = await fetch('/generate', { method: 'POST', body: formData });
                 const data = await resp.json();
 
                 if (data.error) {
                     error.textContent = data.error;
                     error.style.display = 'block';
                 } else {
-                    sessionStorage.setItem('slides', JSON.stringify(data.slides));
-                    window.location.href = '/slides';
+                    renderPreview(data.slides);
                 }
             } catch (err) {
                 error.textContent = '通信エラーが発生しました。もう一度お試しください。';
@@ -316,6 +377,18 @@
                 loading.style.display = 'none';
                 btn.disabled = false;
             }
+        });
+
+        // === プレビュー → 入力に戻る ===
+        document.getElementById('btnBackToInput').addEventListener('click', () => {
+            showStep('input');
+        });
+
+        // === プレビュー → スライド化 ===
+        document.getElementById('btnToSlides').addEventListener('click', () => {
+            const edited = collectEditedSlides();
+            sessionStorage.setItem('slides', JSON.stringify(edited));
+            window.location.href = '/slides';
         });
     </script>
 </body>

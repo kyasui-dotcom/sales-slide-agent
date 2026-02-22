@@ -530,3 +530,215 @@ textarea {
     background: #f7f8fc;
     border-color: #ccc;
 }
+
+/* ========================================
+   プレビュー・編集画面
+   ======================================== */
+.preview-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.preview-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.preview-header h2 {
+    font-size: 1.5rem;
+    color: #1a1a2e;
+    margin-bottom: 0.3rem;
+}
+
+.preview-subtitle {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+/* スライドカード */
+.preview-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.preview-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.preview-card-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.preview-card-type {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.type-cover { background: #6366f1; }
+.type-analysis { background: #ef4444; }
+.type-proposal { background: #22c55e; }
+.type-flow { background: #f59e0b; }
+.type-pricing { background: #8b5cf6; }
+.type-summary { background: #0ea5e9; }
+
+.preview-field {
+    margin-bottom: 1rem;
+}
+
+.preview-field label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #888;
+    margin-bottom: 0.3rem;
+}
+
+.preview-title-input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    font-family: inherit;
+    background: #fafbfe;
+}
+
+.preview-title-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+}
+
+.preview-content-input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+    line-height: 1.5;
+    background: #fafbfe;
+    resize: vertical;
+    min-height: 120px;
+}
+
+.preview-content-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+}
+
+/* Markdownプレビュー */
+.preview-rendered {
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: #333;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.preview-rendered h1,
+.preview-rendered h2,
+.preview-rendered h3 {
+    margin-top: 0.5em;
+    margin-bottom: 0.3em;
+    color: #1a1a2e;
+}
+
+.preview-rendered ul,
+.preview-rendered ol {
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+}
+
+.preview-rendered li {
+    margin-bottom: 0.3em;
+}
+
+.preview-rendered table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8em 0;
+    font-size: 0.85em;
+}
+
+.preview-rendered th,
+.preview-rendered td {
+    border: 1px solid #d1d5db;
+    padding: 6px 10px;
+    text-align: left;
+}
+
+.preview-rendered th {
+    background: #2563eb;
+    color: #fff;
+    font-weight: 600;
+}
+
+.preview-rendered tr:nth-child(even) {
+    background: #f3f4f6;
+}
+
+.preview-rendered strong {
+    color: #2563eb;
+}
+
+/* アクションバー */
+.preview-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 0;
+    margin-top: 0.5rem;
+    border-top: 1px solid #e5e7eb;
+    position: sticky;
+    bottom: 0;
+    background: #f7f8fc;
+    z-index: 10;
+}
+
+.btn-back {
+    padding: 0.7rem 1.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: #fff;
+    color: #555;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-back:hover {
+    background: #f3f4f6;
+    border-color: #aaa;
+}
+
+.btn-to-slides {
+    max-width: 280px;
+}
