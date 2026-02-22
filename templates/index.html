@@ -56,18 +56,111 @@
                 </div>
 
                 <button type="submit" class="btn-generate" id="btnGenerate">
-                    提案資料を生成
+                    商品分析を開始
                 </button>
             </form>
 
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p>AIが提案資料を生成しています...</p>
-                <p class="loading-sub">30秒〜1分ほどお待ちください</p>
+                <p>AIが商品情報を分析しています...</p>
+                <p class="loading-sub">20秒〜30秒ほどお待ちください</p>
             </div>
 
             <div class="error" id="error"></div>
         </div>
+    </div>
+
+    <!-- ===== STEP 1.5: 商品認識・市場確認画面 ===== -->
+    <div class="analysis-container" id="stepAnalysis" style="display:none;">
+        <div class="analysis-header">
+            <h2>商品認識・市場確認</h2>
+            <p class="analysis-subtitle">AIが読み取った商品・市場の理解を確認してください。修正があれば各項目を編集できます。</p>
+        </div>
+
+        <div class="analysis-cards">
+            <!-- 基本情報 -->
+            <div class="analysis-card">
+                <div class="analysis-card-icon">&#128736;</div>
+                <h3>基本情報</h3>
+                <div class="analysis-field">
+                    <label for="aProductName">商品・サービス名</label>
+                    <input type="text" id="aProductName" class="analysis-input">
+                </div>
+                <div class="analysis-field">
+                    <label for="aProductSummary">概要</label>
+                    <textarea id="aProductSummary" class="analysis-textarea" rows="3"></textarea>
+                </div>
+                <div class="analysis-field">
+                    <label for="aPriceRange">価格帯</label>
+                    <input type="text" id="aPriceRange" class="analysis-input">
+                </div>
+            </div>
+
+            <!-- 強み -->
+            <div class="analysis-card">
+                <div class="analysis-card-icon">&#11088;</div>
+                <h3>強み</h3>
+                <div id="aStrengths" class="analysis-list-editable">
+                    <!-- JSで動的に生成 -->
+                </div>
+                <button type="button" class="btn-add-item" data-target="aStrengths">+ 追加</button>
+            </div>
+
+            <!-- ターゲット市場 -->
+            <div class="analysis-card">
+                <div class="analysis-card-icon">&#127919;</div>
+                <h3>ターゲット市場</h3>
+                <div class="analysis-field">
+                    <label for="aTargetMarket">想定ターゲット市場</label>
+                    <textarea id="aTargetMarket" class="analysis-textarea" rows="2"></textarea>
+                </div>
+                <div class="analysis-field">
+                    <label for="aMarketSize">市場規模（推定）</label>
+                    <input type="text" id="aMarketSize" class="analysis-input">
+                </div>
+            </div>
+
+            <!-- 競合 -->
+            <div class="analysis-card">
+                <div class="analysis-card-icon">&#9876;</div>
+                <h3>競合</h3>
+                <div id="aCompetitors" class="analysis-list-editable">
+                    <!-- JSで動的に生成 -->
+                </div>
+                <button type="button" class="btn-add-item" data-target="aCompetitors">+ 追加</button>
+            </div>
+
+            <!-- 市場の課題 -->
+            <div class="analysis-card">
+                <div class="analysis-card-icon">&#9888;</div>
+                <h3>市場の課題</h3>
+                <div id="aMarketChallenges" class="analysis-list-editable">
+                    <!-- JSで動的に生成 -->
+                </div>
+                <button type="button" class="btn-add-item" data-target="aMarketChallenges">+ 追加</button>
+            </div>
+
+            <!-- ブルーオーシャンの可能性 -->
+            <div class="analysis-card analysis-card-highlight">
+                <div class="analysis-card-icon">&#128161;</div>
+                <h3>ブルーオーシャンの可能性</h3>
+                <div class="analysis-field">
+                    <textarea id="aBlueOcean" class="analysis-textarea" rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="analysis-actions">
+            <button class="btn-back" id="btnBackFromAnalysis">&#8592; 入力に戻る</button>
+            <button class="btn-generate btn-confirm-analysis" id="btnConfirmAnalysis">この内容で提案資料を生成 &#8594;</button>
+        </div>
+
+        <div class="loading" id="loadingGenerate" style="display:none;">
+            <div class="spinner"></div>
+            <p>AIが提案資料を生成しています...</p>
+            <p class="loading-sub">30秒〜1分ほどお待ちください</p>
+        </div>
+        <div class="error" id="errorGenerate" style="display:none;"></div>
     </div>
 
     <!-- ===== STEP 2: プレビュー・編集画面 ===== -->
@@ -82,7 +175,7 @@
         </div>
 
         <div class="preview-actions">
-            <button class="btn-back" id="btnBackToInput">&#8592; 入力に戻る</button>
+            <button class="btn-back" id="btnBackToInput">&#8592; 分析に戻る</button>
             <button class="btn-generate btn-to-slides" id="btnToSlides">この内容でスライド化 &#8594;</button>
         </div>
     </div>
@@ -186,9 +279,13 @@
 
         updateApiWarning();
 
+        // === 状態保持（分析結果と元テキスト） ===
+        let analysisRawText = '';
+
         // === 画面切替 ===
         function showStep(step) {
             document.getElementById('stepInput').style.display = step === 'input' ? '' : 'none';
+            document.getElementById('stepAnalysis').style.display = step === 'analysis' ? '' : 'none';
             document.getElementById('stepPreview').style.display = step === 'preview' ? '' : 'none';
         }
 
@@ -337,7 +434,72 @@
             document.getElementById('fileLabel').textContent = e.target.files[0]?.name || 'クリックしてPDFを選択';
         });
 
-        // === フォーム送信 → プレビュー ===
+        // === 分析結果を確認画面に表示 ===
+        function renderAnalysis(analysis) {
+            document.getElementById('aProductName').value = analysis.product_name || '';
+            document.getElementById('aProductSummary').value = analysis.product_summary || '';
+            document.getElementById('aPriceRange').value = analysis.price_range || '';
+            document.getElementById('aTargetMarket').value = analysis.target_market || '';
+            document.getElementById('aMarketSize').value = analysis.market_size || '';
+            document.getElementById('aBlueOcean').value = analysis.blue_ocean_hint || '';
+
+            renderEditableList('aStrengths', analysis.strengths || []);
+            renderEditableList('aCompetitors', analysis.competitors || []);
+            renderEditableList('aMarketChallenges', analysis.market_challenges || []);
+        }
+
+        function renderEditableList(containerId, items) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            items.forEach((item, i) => {
+                const row = document.createElement('div');
+                row.className = 'analysis-list-row';
+                row.innerHTML = `
+                    <input type="text" class="analysis-input analysis-list-input" value="${(item || '').replace(/"/g, '&quot;')}">
+                    <button type="button" class="btn-remove-item" title="削除">&times;</button>
+                `;
+                row.querySelector('.btn-remove-item').addEventListener('click', () => row.remove());
+                container.appendChild(row);
+            });
+        }
+
+        // リスト項目追加ボタン
+        document.querySelectorAll('.btn-add-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const container = document.getElementById(btn.dataset.target);
+                const row = document.createElement('div');
+                row.className = 'analysis-list-row';
+                row.innerHTML = `
+                    <input type="text" class="analysis-input analysis-list-input" value="" placeholder="新しい項目を入力">
+                    <button type="button" class="btn-remove-item" title="削除">&times;</button>
+                `;
+                row.querySelector('.btn-remove-item').addEventListener('click', () => row.remove());
+                container.appendChild(row);
+                row.querySelector('input').focus();
+            });
+        });
+
+        // === 確認画面から編集済みの分析データを収集 ===
+        function collectAnalysis() {
+            const getListValues = (containerId) => {
+                return Array.from(document.querySelectorAll(`#${containerId} .analysis-list-input`))
+                    .map(input => input.value.trim())
+                    .filter(v => v);
+            };
+            return {
+                product_name: document.getElementById('aProductName').value.trim(),
+                product_summary: document.getElementById('aProductSummary').value.trim(),
+                price_range: document.getElementById('aPriceRange').value.trim(),
+                strengths: getListValues('aStrengths'),
+                target_market: document.getElementById('aTargetMarket').value.trim(),
+                market_size: document.getElementById('aMarketSize').value.trim(),
+                competitors: getListValues('aCompetitors'),
+                market_challenges: getListValues('aMarketChallenges'),
+                blue_ocean_hint: document.getElementById('aBlueOcean').value.trim()
+            };
+        }
+
+        // === Step 1: フォーム送信 → 分析確認画面 ===
         document.getElementById('generateForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const loading = document.getElementById('loading');
@@ -358,17 +520,18 @@
             try {
                 const formData = new FormData(e.target);
                 formData.append('api_key', apiKey);
-                const customPrompt = getCustomPrompt();
-                if (customPrompt) formData.append('custom_prompt', customPrompt);
 
-                const resp = await fetch('/generate', { method: 'POST', body: formData });
+                const resp = await fetch('/analyze', { method: 'POST', body: formData });
                 const data = await resp.json();
 
                 if (data.error) {
                     error.textContent = data.error;
                     error.style.display = 'block';
                 } else {
-                    renderPreview(data.slides);
+                    analysisRawText = data.raw_text;
+                    renderAnalysis(data.analysis);
+                    showStep('analysis');
+                    window.scrollTo(0, 0);
                 }
             } catch (err) {
                 error.textContent = '通信エラーが発生しました。もう一度お試しください。';
@@ -379,9 +542,63 @@
             }
         });
 
-        // === プレビュー → 入力に戻る ===
-        document.getElementById('btnBackToInput').addEventListener('click', () => {
+        // === Step 1.5: 分析確認 → 入力に戻る ===
+        document.getElementById('btnBackFromAnalysis').addEventListener('click', () => {
             showStep('input');
+        });
+
+        // === Step 1.5: 分析確認 → スライド生成 ===
+        document.getElementById('btnConfirmAnalysis').addEventListener('click', async () => {
+            const loadingGen = document.getElementById('loadingGenerate');
+            const errorGen = document.getElementById('errorGenerate');
+            const btn = document.getElementById('btnConfirmAnalysis');
+
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                errorGen.textContent = 'APIキーが設定されていません。';
+                errorGen.style.display = 'block';
+                return;
+            }
+
+            errorGen.style.display = 'none';
+            loadingGen.style.display = 'block';
+            btn.disabled = true;
+
+            try {
+                const analysis = collectAnalysis();
+                const analysisContext = JSON.stringify(analysis, null, 2);
+                const customPrompt = getCustomPrompt();
+
+                const resp = await fetch('/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: apiKey,
+                        raw_text: analysisRawText,
+                        analysis_context: analysisContext,
+                        custom_prompt: customPrompt || ''
+                    })
+                });
+                const data = await resp.json();
+
+                if (data.error) {
+                    errorGen.textContent = data.error;
+                    errorGen.style.display = 'block';
+                } else {
+                    renderPreview(data.slides);
+                }
+            } catch (err) {
+                errorGen.textContent = '通信エラーが発生しました。もう一度お試しください。';
+                errorGen.style.display = 'block';
+            } finally {
+                loadingGen.style.display = 'none';
+                btn.disabled = false;
+            }
+        });
+
+        // === プレビュー → 分析確認に戻る ===
+        document.getElementById('btnBackToInput').addEventListener('click', () => {
+            showStep('analysis');
         });
 
         // === プレビュー → スライド化 ===

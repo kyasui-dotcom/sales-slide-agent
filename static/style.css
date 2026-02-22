@@ -532,6 +532,200 @@ textarea {
 }
 
 /* ========================================
+   商品認識・市場確認画面
+   ======================================== */
+.analysis-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.analysis-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.analysis-header h2 {
+    font-size: 1.5rem;
+    color: #1a1a2e;
+    margin-bottom: 0.3rem;
+}
+
+.analysis-subtitle {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+/* 分析カードグリッド */
+.analysis-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .analysis-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+.analysis-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1.3rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s;
+}
+
+.analysis-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.analysis-card-highlight {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #eef2ff 0%, #f0fdf4 100%);
+    border-color: #a5b4fc;
+}
+
+.analysis-card-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.3rem;
+}
+
+.analysis-card h3 {
+    font-size: 1rem;
+    color: #1a1a2e;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.analysis-field {
+    margin-bottom: 0.8rem;
+}
+
+.analysis-field label {
+    font-size: 0.78rem;
+    color: #888;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+
+.analysis-input {
+    width: 100%;
+    padding: 0.55rem 0.8rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: #fafbfe;
+    transition: border-color 0.2s;
+}
+
+.analysis-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+}
+
+.analysis-textarea {
+    width: 100%;
+    padding: 0.55rem 0.8rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    background: #fafbfe;
+    resize: vertical;
+    line-height: 1.5;
+    transition: border-color 0.2s;
+}
+
+.analysis-textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+}
+
+/* 編集可能リスト */
+.analysis-list-editable {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.analysis-list-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.analysis-list-input {
+    flex: 1;
+}
+
+.btn-remove-item {
+    background: none;
+    border: 1px solid #fca5a5;
+    border-radius: 6px;
+    color: #ef4444;
+    font-size: 1.1rem;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-remove-item:hover {
+    background: #fef2f2;
+    border-color: #ef4444;
+}
+
+.btn-add-item {
+    background: none;
+    border: 1px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 0.4rem 0.8rem;
+    color: #888;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    text-align: center;
+}
+
+.btn-add-item:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+    background: #eef2ff;
+}
+
+/* 分析画面のアクションバー */
+.analysis-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.2rem 0;
+    margin-top: 0.5rem;
+    border-top: 1px solid #e5e7eb;
+    position: sticky;
+    bottom: 0;
+    background: #f7f8fc;
+    z-index: 10;
+}
+
+.btn-confirm-analysis {
+    max-width: 320px;
+}
+
+/* ========================================
    プレビュー・編集画面
    ======================================== */
 .preview-container {

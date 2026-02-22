@@ -28,6 +28,29 @@ DEFAULT_ROLE_PROMPT = """あなたは、B2B商材の市場分析と営業戦略�
 - 表や箇条書きを多用し、そのまま提案資料として使える品質にすること。
 - 具体的な数値や事例を含め、説得力のある内容にすること。"""
 
+# 商品認識・市場分析の確認用プロンプト
+ANALYZE_PROMPT = """あなたは、B2B商材の市場分析を行うプロフェッショナルな営業コンサルタントです。
+
+以下の商品・サービス情報を読み取り、あなたの理解をJSON形式で整理してください。
+このあと、この理解をベースに営業提案資料を作成します。
+
+# 出力形式（必ずこのJSON形式で出力）
+```json
+{
+  "product_name": "商品・サービス名",
+  "product_summary": "商品・サービスの概要（2-3文）",
+  "strengths": ["強み1", "強み2", "強み3"],
+  "target_market": "現在想定されるターゲット市場",
+  "market_size": "市場規模の推定（わかる範囲で）",
+  "competitors": ["主な競合1", "主な競合2", "主な競合3"],
+  "market_challenges": ["市場の課題1", "市場の課題2"],
+  "price_range": "価格帯（わかる範囲で）",
+  "blue_ocean_hint": "ブルーオーシャンの可能性（一言で）"
+}
+```
+
+JSON以外のテキストは含めないこと。"""
+
 # システム固定部分（JSON出力ルール）- ユーザーからは編集不可
 SYSTEM_OUTPUT_RULES = """
 # 出力ルール（※この部分はシステム固定です）
@@ -82,26 +105,73 @@ def extract_text_from_pdf(file_storage):
     return text[:8000]
 
 
-def generate_slides(api_key, product_info, custom_prompt=None):
+def _extract_product_info(input_type, form, files):
+    """リクエストから商品情報テキストを抽出する共通処理"""
+    if input_type == "url":
+        url = form.get("url", "").strip()
+        if not url:
+            raise ValueError("URLを入力してください")
+        return extract_text_from_url(url)
+    elif input_type == "pdf":
+        if "pdf_file" not in files:
+            raise ValueError("PDFファイルを選択してください")
+        pdf_file = files["pdf_file"]
+        if pdf_file.filename == "":
+            raise ValueError("PDFファイルを選択してください")
+        return extract_text_from_pdf(pdf_file)
+    elif input_type == "text":
+        text = form.get("text_input", "").strip()
+        if not text:
+            raise ValueError("商品情報を入力してください")
+        return text
+    else:
+        raise ValueError("無効な入力タイプです")
+
+
+def analyze_product(api_key, product_info):
+    """商品情報をAIに分析させ、認識結果をJSONで返す"""
+    client = OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": ANALYZE_PROMPT},
+            {
+                "role": "user",
+                "content": f"以下の商品・サービス情報を分析してください。\n\n{product_info}",
+            },
+        ],
+        temperature=0.5,
+        max_tokens=2000,
+    )
+    content = response.choices[0].message.content.strip()
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0].strip()
+    elif "```" in content:
+        content = content.split("```")[1].split("```")[0].strip()
+    return json.loads(content)
+
+
+def generate_slides(api_key, product_info, analysis_context=None, custom_prompt=None):
     """OpenAI APIで提案資料スライドを生成"""
     role_prompt = custom_prompt if custom_prompt else DEFAULT_ROLE_PROMPT
     system_prompt = role_prompt + "\n" + SYSTEM_OUTPUT_RULES
+
+    user_message = "以下の商品・サービス情報をもとに、営業提案資料のスライドを作成してください。\n\n"
+    if analysis_context:
+        user_message += f"【AIによる事前分析（確認済み）】\n{analysis_context}\n\n"
+    user_message += f"【元の商品情報】\n{product_info}"
 
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": f"以下の商品・サービス情報をもとに、営業提案資料のスライドを作成してください。\n\n{product_info}",
-            },
+            {"role": "user", "content": user_message},
         ],
         temperature=0.7,
         max_tokens=4096,
     )
     content = response.choices[0].message.content.strip()
-    # JSON部分を抽出（```json ... ``` で囲まれている場合に対応）
     if "```json" in content:
         content = content.split("```json")[1].split("```")[0].strip()
     elif "```" in content:
@@ -120,46 +190,62 @@ def default_prompt():
     return jsonify({"prompt": DEFAULT_ROLE_PROMPT})
 
 
-@app.route("/generate", methods=["POST"])
-def generate():
+@app.route("/analyze", methods=["POST"])
+def analyze():
+    """Step 1: 商品認識・市場確認"""
     input_type = request.form.get("input_type", "text")
     api_key = request.form.get("api_key", "").strip()
-    custom_prompt = request.form.get("custom_prompt", "").strip() or None
 
     if not api_key:
         return jsonify({"error": "APIキーが設定されていません。画面右上の歯車アイコンから設定してください。"}), 400
 
     try:
-        if input_type == "url":
-            url = request.form.get("url", "").strip()
-            if not url:
-                return jsonify({"error": "URLを入力してください"}), 400
-            product_info = extract_text_from_url(url)
-
-        elif input_type == "pdf":
-            if "pdf_file" not in request.files:
-                return jsonify({"error": "PDFファイルを選択してください"}), 400
-            pdf_file = request.files["pdf_file"]
-            if pdf_file.filename == "":
-                return jsonify({"error": "PDFファイルを選択してください"}), 400
-            product_info = extract_text_from_pdf(pdf_file)
-
-        elif input_type == "text":
-            product_info = request.form.get("text_input", "").strip()
-            if not product_info:
-                return jsonify({"error": "商品情報を入力してください"}), 400
-
-        else:
-            return jsonify({"error": "無効な入力タイプです"}), 400
+        product_info = _extract_product_info(input_type, request.form, request.files)
 
         if len(product_info.strip()) < 10:
             return jsonify({"error": "商品情報が短すぎます。もう少し詳しい情報を入力してください"}), 400
 
-        slides = generate_slides(api_key, product_info, custom_prompt)
-        return jsonify({"slides": slides})
+        analysis = analyze_product(api_key, product_info)
+        return jsonify({"analysis": analysis, "raw_text": product_info})
 
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except requests.RequestException as e:
         return jsonify({"error": f"URLの取得に失敗しました: {str(e)}"}), 400
+    except json.JSONDecodeError:
+        return jsonify({"error": "AIからの応答の解析に失敗しました。もう一度お試しください"}), 500
+    except Exception as e:
+        error_msg = str(e)
+        if "authentication" in error_msg.lower() or "api key" in error_msg.lower():
+            return jsonify({"error": "APIキーが無効です。正しいキーを設定してください。"}), 401
+        return jsonify({"error": f"エラーが発生しました: {error_msg}"}), 500
+
+
+@app.route("/generate", methods=["POST"])
+def generate():
+    """Step 2: 提案資料スライド生成"""
+    api_key = request.json.get("api_key", "").strip() if request.is_json else request.form.get("api_key", "").strip()
+
+    if not api_key:
+        return jsonify({"error": "APIキーが設定されていません。"}), 400
+
+    try:
+        if request.is_json:
+            data = request.json
+            product_info = data.get("raw_text", "")
+            analysis_context = data.get("analysis_context", "")
+            custom_prompt = data.get("custom_prompt", "").strip() or None
+        else:
+            product_info = request.form.get("raw_text", "")
+            analysis_context = request.form.get("analysis_context", "")
+            custom_prompt = request.form.get("custom_prompt", "").strip() or None
+
+        if not product_info:
+            return jsonify({"error": "商品情報がありません"}), 400
+
+        slides = generate_slides(api_key, product_info, analysis_context, custom_prompt)
+        return jsonify({"slides": slides})
+
     except json.JSONDecodeError:
         return jsonify({"error": "AIからの応答の解析に失敗しました。もう一度お試しください"}), 500
     except Exception as e:
