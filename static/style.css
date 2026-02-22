@@ -292,8 +292,13 @@ textarea {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     width: 90%;
     max-width: 480px;
-    overflow: hidden;
+    max-height: 85vh;
+    overflow-y: auto;
     animation: modalIn 0.2s ease-out;
+}
+
+.modal.modal-wide {
+    max-width: 640px;
 }
 
 @keyframes modalIn {
@@ -437,4 +442,91 @@ textarea {
     background: #fef2f2;
     color: #dc2626;
     border: 1px solid #fca5a5;
+}
+
+/* === モーダル内タブ === */
+.modal-tabs {
+    display: flex;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.modal-tab {
+    flex: 1;
+    padding: 0.7rem 1rem;
+    border: none;
+    background: none;
+    color: #888;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+}
+
+.modal-tab.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+}
+
+.modal-tab:hover:not(.active) {
+    color: #555;
+    background: #f8f9fc;
+}
+
+.modal-tab-content {
+    display: none;
+}
+
+.modal-tab-content.active {
+    display: block;
+}
+
+/* === プロンプトエディタ === */
+.prompt-hint {
+    font-size: 0.78rem;
+    color: #999;
+    margin-bottom: 0.8rem;
+    line-height: 1.5;
+}
+
+.prompt-editor {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+    line-height: 1.6;
+    background: #fafbfe;
+    resize: vertical;
+    min-height: 280px;
+}
+
+.prompt-editor:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+}
+
+.prompt-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+}
+
+.btn-reset {
+    padding: 0.7rem 1.2rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-reset:hover {
+    background: #f7f8fc;
+    border-color: #ccc;
 }

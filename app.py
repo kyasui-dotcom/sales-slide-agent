@@ -10,14 +10,22 @@ from PyPDF2 import PdfReader
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
 
-SYSTEM_PROMPT = """あなたは、B2B商材の市場分析と営業戦略の立案を行うプロフェッショナルな営業コンサルタントです。
+# ユーザーが編集できるプロンプト部分（役割・思考プロセス・トーン）
+DEFAULT_ROLE_PROMPT = """あなたは、B2B商材の市場分析と営業戦略の立案を行うプロフェッショナルな営業コンサルタントです。
 
 # 思考プロセス
 1. 市場の「不都合な真実」を指摘：クライアントが狙っている市場の難所（既得権益、予算不足等）を冷静に分析し、あえて「そこは厳しい」と伝える。
 2. ブルーオーシャン（新用途）の提示：商品の特性を活かし、別の「深い悩み（集客、売上、ブランド）」を持つターゲットへスライドさせる。
 3. 時間軸を捉えた営業フロー：単なるアポ取りではなく、顧客の「予算編成時期」や「意思決定サイクル」を逆算したプロセスを構築する。
 
-# 出力ルール
+# トーン
+- 客観的で冷静、かつ解決策に対しては情熱的であること。
+- 表や箇条書きを多用し、そのまま提案資料として使える品質にすること。
+- 具体的な数値や事例を含め、説得力のある内容にすること。"""
+
+# システム固定部分（JSON出力ルール）- ユーザーからは編集不可
+SYSTEM_OUTPUT_RULES = """
+# 出力ルール（※この部分はシステム固定です）
 以下のJSON配列形式で出力してください。各要素が1枚のスライドになります。
 マークダウン記法を使用してください（箇条書き、太字、表など）。
 
@@ -31,16 +39,15 @@ SYSTEM_PROMPT = """あなたは、B2B商材の市場分析と営業戦略の立�
 ]
 ```
 
-# スライド構成（必ずこの順序で6枚以上）
+# スライド構成（必ずこの順序で8枚以上）
 1. **表紙** (type: "cover") - 提案タイトルと対象商材名
-2. **市場環境分析** (type: "analysis") - 市場の不都合な真実、競合状況、参入障壁（複数枚可）
-3. **新ターゲット提案** (type: "proposal") - ブルーオーシャン戦略、新しいターゲット層、なぜそこが狙い目か（複数枚可）
-4. **営業フロー** (type: "flow") - 時間軸を捉えた具体的な営業プロセス、予算編成時期の逆算（複数枚可）
-5. **支援範囲と成果報酬** (type: "pricing") - 具体的な支援内容と成果報酬体系
-6. **まとめ** (type: "summary") - 要点整理と次のアクション
+2. **市場環境分析** (type: "analysis") - 市場の不都合な真実、競合状況、参入障壁。表やデータを交えて複数枚で詳しく。
+3. **新ターゲット提案** (type: "proposal") - ブルーオーシャン戦略、新しいターゲット層、なぜそこが狙い目か。具体的な業界・企業規模・課題を明記。複数枚で詳しく。
+4. **営業フロー** (type: "flow") - 時間軸を捉えた具体的な営業プロセス、予算編成時期の逆算。月別・週別のアクション表を含める。複数枚で詳しく。
+5. **支援範囲と成果報酬** (type: "pricing") - 具体的な支援内容と成果報酬体系。表形式で明確に。
+6. **まとめ** (type: "summary") - 要点整理と次の具体的アクション
 
-トーンは客観的で冷静、かつ解決策に対しては情熱的であること。
-表や箇条書きを多用し、そのまま提案資料として使える品質にすること。
+各スライドの内容は十分な分量を確保し、箇条書き3行程度で終わらせず、深い分析と具体的な提案を含めること。
 JSON配列のみを出力し、それ以外のテキストは含めないこと。"""
 
 
@@ -70,20 +77,23 @@ def extract_text_from_pdf(file_storage):
     return text[:8000]
 
 
-def generate_slides(api_key, product_info):
-    """OpenAI APIで提案資料スライドを生成（リクエストごとにAPIキーを使用）"""
+def generate_slides(api_key, product_info, custom_prompt=None):
+    """OpenAI APIで提案資料スライドを生成"""
+    role_prompt = custom_prompt if custom_prompt else DEFAULT_ROLE_PROMPT
+    system_prompt = role_prompt + "\n" + SYSTEM_OUTPUT_RULES
+
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {
                 "role": "user",
                 "content": f"以下の商品・サービス情報をもとに、営業提案資料のスライドを作成してください。\n\n{product_info}",
             },
         ],
         temperature=0.7,
-        max_tokens=4000,
+        max_tokens=4096,
     )
     content = response.choices[0].message.content.strip()
     # JSON部分を抽出（```json ... ``` で囲まれている場合に対応）
@@ -99,10 +109,17 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/default-prompt")
+def default_prompt():
+    """デフォルトプロンプトを返すAPI"""
+    return jsonify({"prompt": DEFAULT_ROLE_PROMPT})
+
+
 @app.route("/generate", methods=["POST"])
 def generate():
     input_type = request.form.get("input_type", "text")
     api_key = request.form.get("api_key", "").strip()
+    custom_prompt = request.form.get("custom_prompt", "").strip() or None
 
     if not api_key:
         return jsonify({"error": "APIキーが設定されていません。画面右上の歯車アイコンから設定してください。"}), 400
@@ -133,7 +150,7 @@ def generate():
         if len(product_info.strip()) < 10:
             return jsonify({"error": "商品情報が短すぎます。もう少し詳しい情報を入力してください"}), 400
 
-        slides = generate_slides(api_key, product_info)
+        slides = generate_slides(api_key, product_info, custom_prompt)
         return jsonify({"slides": slides})
 
     except requests.RequestException as e:

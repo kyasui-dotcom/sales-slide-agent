@@ -11,7 +11,7 @@
         <div class="card">
             <div class="card-header">
                 <h1>営業提案資料ジェネレーター</h1>
-                <button class="btn-settings" id="btnSettings" title="API設定">
+                <button class="btn-settings" id="btnSettings" title="設定">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -68,35 +68,82 @@
         </div>
     </div>
 
-    <!-- APIキー設定モーダル -->
+    <!-- 設定モーダル -->
     <div class="modal-overlay" id="modalOverlay">
-        <div class="modal">
+        <div class="modal modal-wide">
             <div class="modal-header">
-                <h2>API設定</h2>
+                <h2>設定</h2>
                 <button class="modal-close" id="modalClose">&times;</button>
             </div>
-            <div class="modal-body">
-                <label for="apiKeyInput">OpenAI APIキー</label>
-                <div class="api-key-field">
-                    <input type="password" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxx">
-                    <button type="button" class="btn-toggle-visibility" id="btnToggleKey" title="表示/非表示">
-                        <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
+
+            <!-- モーダル内タブ -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-modal-tab="apikey">APIキー</button>
+                <button class="modal-tab" data-modal-tab="prompt">プロンプト</button>
+            </div>
+
+            <!-- APIキータブ -->
+            <div class="modal-tab-content active" id="modal-tab-apikey">
+                <div class="modal-body">
+                    <label for="apiKeyInput">OpenAI APIキー</label>
+                    <div class="api-key-field">
+                        <input type="password" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxx">
+                        <button type="button" class="btn-toggle-visibility" id="btnToggleKey" title="表示/非表示">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="api-key-hint">APIキーはブラウザのローカルストレージに保存されます。サーバーには保存されません。</p>
+                    <div class="modal-actions">
+                        <button class="btn-save" id="btnSaveKey">保存</button>
+                        <button class="btn-delete" id="btnDeleteKey">削除</button>
+                    </div>
+                    <div class="api-key-status" id="apiKeyStatus"></div>
                 </div>
-                <p class="api-key-hint">APIキーはブラウザのローカルストレージに保存されます。サーバーには保存されません。</p>
-                <div class="modal-actions">
-                    <button class="btn-save" id="btnSaveKey">保存</button>
-                    <button class="btn-delete" id="btnDeleteKey">削除</button>
+            </div>
+
+            <!-- プロンプトタブ -->
+            <div class="modal-tab-content" id="modal-tab-prompt">
+                <div class="modal-body">
+                    <label for="promptTextarea">AIへの指示プロンプト（役割・思考プロセス・トーン）</label>
+                    <p class="prompt-hint">AIの役割、分析の思考プロセス、出力のトーンを自由に調整できます。<br>スライドの構成ルール（JSON形式・枚数等）はシステム側で固定されているため、ここでは変更不要です。</p>
+                    <textarea id="promptTextarea" class="prompt-editor" rows="16" placeholder="プロンプトを入力..."></textarea>
+                    <div class="prompt-actions">
+                        <button class="btn-save" id="btnSavePrompt">保存</button>
+                        <button class="btn-reset" id="btnResetPrompt">デフォルトに戻す</button>
+                    </div>
+                    <div class="api-key-status" id="promptStatus"></div>
                 </div>
-                <div class="api-key-status" id="apiKeyStatus"></div>
             </div>
         </div>
     </div>
 
     <script>
+        // === デフォルトプロンプト管理 ===
+        let defaultPrompt = '';
+
+        // サーバーからデフォルトプロンプトを取得
+        async function fetchDefaultPrompt() {
+            try {
+                const resp = await fetch('/api/default-prompt');
+                const data = await resp.json();
+                defaultPrompt = data.prompt;
+            } catch (e) {
+                console.error('デフォルトプロンプト取得失敗:', e);
+            }
+        }
+        fetchDefaultPrompt();
+
+        function getCustomPrompt() {
+            return localStorage.getItem('custom_prompt') || '';
+        }
+
+        function getEffectivePrompt() {
+            return getCustomPrompt() || defaultPrompt;
+        }
+
         // === APIキー管理 ===
         function getApiKey() {
             return localStorage.getItem('openai_api_key') || '';
@@ -111,15 +158,17 @@
             }
         }
 
-        // 初期表示時にチェック
         updateApiWarning();
 
-        // 設定モーダル
+        // === 設定モーダル ===
         const modalOverlay = document.getElementById('modalOverlay');
         const apiKeyInput = document.getElementById('apiKeyInput');
+        const promptTextarea = document.getElementById('promptTextarea');
 
+        // モーダル開閉
         document.getElementById('btnSettings').addEventListener('click', () => {
             apiKeyInput.value = getApiKey();
+            promptTextarea.value = getEffectivePrompt();
             modalOverlay.classList.add('active');
         });
 
@@ -131,49 +180,74 @@
             if (e.target === modalOverlay) modalOverlay.classList.remove('active');
         });
 
-        // 表示/非表示トグル
-        document.getElementById('btnToggleKey').addEventListener('click', () => {
-            const input = apiKeyInput;
-            input.type = input.type === 'password' ? 'text' : 'password';
+        // モーダル内タブ切替
+        document.querySelectorAll('.modal-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                const target = tab.dataset.modalTab;
+                document.getElementById('modal-tab-' + target).classList.add('active');
+            });
         });
 
-        // 保存
+        // === APIキー操作 ===
+        document.getElementById('btnToggleKey').addEventListener('click', () => {
+            apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+        });
+
         document.getElementById('btnSaveKey').addEventListener('click', () => {
             const key = apiKeyInput.value.trim();
             if (!key) {
-                showKeyStatus('APIキーを入力してください', 'error');
+                showStatus('apiKeyStatus', 'APIキーを入力してください', 'error');
                 return;
             }
             if (!key.startsWith('sk-')) {
-                showKeyStatus('APIキーは "sk-" で始まる必要があります', 'error');
+                showStatus('apiKeyStatus', 'APIキーは "sk-" で始まる必要があります', 'error');
                 return;
             }
             localStorage.setItem('openai_api_key', key);
-            showKeyStatus('保存しました', 'success');
+            showStatus('apiKeyStatus', '保存しました', 'success');
             updateApiWarning();
-            setTimeout(() => modalOverlay.classList.remove('active'), 800);
         });
 
-        // 削除
         document.getElementById('btnDeleteKey').addEventListener('click', () => {
             localStorage.removeItem('openai_api_key');
             apiKeyInput.value = '';
-            showKeyStatus('削除しました', 'success');
+            showStatus('apiKeyStatus', '削除しました', 'success');
             updateApiWarning();
         });
 
-        function showKeyStatus(msg, type) {
-            const status = document.getElementById('apiKeyStatus');
+        // === プロンプト操作 ===
+        document.getElementById('btnSavePrompt').addEventListener('click', () => {
+            const prompt = promptTextarea.value.trim();
+            if (!prompt) {
+                showStatus('promptStatus', 'プロンプトを入力してください', 'error');
+                return;
+            }
+            localStorage.setItem('custom_prompt', prompt);
+            showStatus('promptStatus', '保存しました', 'success');
+        });
+
+        document.getElementById('btnResetPrompt').addEventListener('click', () => {
+            localStorage.removeItem('custom_prompt');
+            promptTextarea.value = defaultPrompt;
+            showStatus('promptStatus', 'デフォルトに戻しました', 'success');
+        });
+
+        // 汎用ステータス表示
+        function showStatus(elementId, msg, type) {
+            const status = document.getElementById(elementId);
             status.textContent = msg;
             status.className = 'api-key-status ' + type;
             status.style.display = 'block';
             setTimeout(() => status.style.display = 'none', 3000);
         }
 
-        // === タブ切替 ===
-        document.querySelectorAll('.tab').forEach(tab => {
+        // === メイン画面タブ切替 ===
+        document.querySelectorAll('.tabs .tab').forEach(tab => {
             tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 tab.classList.add('active');
                 const target = tab.dataset.tab;
@@ -195,7 +269,6 @@
             const error = document.getElementById('error');
             const btn = document.getElementById('btnGenerate');
 
-            // APIキーチェック
             const apiKey = getApiKey();
             if (!apiKey) {
                 error.textContent = 'APIキーが設定されていません。右上の歯車アイコンから設定してください。';
@@ -210,6 +283,12 @@
             try {
                 const formData = new FormData(e.target);
                 formData.append('api_key', apiKey);
+
+                // カスタムプロンプトがあれば送信
+                const customPrompt = getCustomPrompt();
+                if (customPrompt) {
+                    formData.append('custom_prompt', customPrompt);
+                }
 
                 const resp = await fetch('/generate', {
                     method: 'POST',
